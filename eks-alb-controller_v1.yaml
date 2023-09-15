@@ -1,0 +1,275 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ALB Controller Add-On
+
+Parameters:
+  EKSClusterName:
+    Type: String
+    Description: EKS Cluster Name
+  OIDCProviderID:
+    Type: String
+    Default: EXAMPLED539D4633E53DE1B71EXAMPLE
+  AccountID:
+    Type: String
+    Description: Your AWS Account ID
+    Default: 123456789
+  Region:
+    Type: String
+    Default: us-east-1
+  CertManagerYamlURL:
+    Type: String
+    Description: EKS Cluster Cert Manager Yaml URL
+    Default: https://github.com/jetstack/cert-manager/releases/download/v1.5.4/cert-manager.yaml
+  ALBControllerYamlURL:
+    Type: String
+    Description: ALB Controller Yaml URL
+    Default: https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.4.7/v2_4_7_full.yaml
+  IngressClassYamlURL:
+    Type: String
+    Description: Ingress Class Yaml URL
+    Default: https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.4.7/v2_4_7_ingclass.yaml
+Resources:
+## Create IAM Policy
+  AWSLoadBalancerControllerIAMPolicyy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AWSLoadBalancerControllerIAMPolicyy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "iam:CreateServiceLinkedRole"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeAccountAttributes"
+              - "ec2:DescribeAddresses"
+              - "ec2:DescribeAvailabilityZones"
+              - "ec2:DescribeInternetGateways"
+              - "ec2:DescribeVpcs"
+              - "ec2:DescribeVpcPeeringConnections"
+              - "ec2:DescribeSubnets"
+              - "ec2:DescribeSecurityGroups"
+              - "ec2:DescribeInstances"
+              - "ec2:DescribeNetworkInterfaces"
+              - "ec2:DescribeTags"
+              - "ec2:GetCoipPoolUsage"
+              - "ec2:DescribeCoipPools"
+              - "elasticloadbalancing:DescribeLoadBalancers"
+              - "elasticloadbalancing:DescribeLoadBalancerAttributes"
+              - "elasticloadbalancing:DescribeListeners"
+              - "elasticloadbalancing:DescribeListenerCertificates"
+              - "elasticloadbalancing:DescribeSSLPolicies"
+              - "elasticloadbalancing:DescribeRules"
+              - "elasticloadbalancing:DescribeTargetGroups"
+              - "elasticloadbalancing:DescribeTargetGroupAttributes"
+              - "elasticloadbalancing:DescribeTargetHealth"
+              - "elasticloadbalancing:DescribeTags"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "cognito-idp:DescribeUserPoolClient"
+              - "acm:ListCertificates"
+              - "acm:DescribeCertificate"
+              - "iam:ListServerCertificates"
+              - "iam:GetServerCertificate"
+              - "waf-regional:GetWebACL"
+              - "waf-regional:GetWebACLForResource"
+              - "waf-regional:AssociateWebACL"
+              - "waf-regional:DisassociateWebACL"
+              - "wafv2:GetWebACL"
+              - "wafv2:GetWebACLForResource"
+              - "wafv2:AssociateWebACL"
+              - "wafv2:DisassociateWebACL"
+              - "shield:GetSubscriptionState"
+              - "shield:DescribeProtection"
+              - "shield:CreateProtection"
+              - "shield:DeleteProtection"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "ec2:AuthorizeSecurityGroupIngress"
+              - "ec2:RevokeSecurityGroupIngress"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "ec2:CreateSecurityGroup"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
+            Resource: "arn:aws:ec2:*:*:security-group/*"
+            Condition:
+              'StringEquals':
+                "ec2:CreateAction": "CreateSecurityGroup"
+              'Null':
+                "aws:RequestTag/elbv2.k8s.aws/cluster": "false"
+          - Effect: Allow
+            Action:
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
+            Resource: "arn:aws:ec2:*:*:security-group/*"
+            Condition:
+              'Null':
+                "aws:RequestTag/elbv2.k8s.aws/cluster": "true"
+                "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+          - Effect: Allow
+            Action:
+              - "ec2:AuthorizeSecurityGroupIngress"
+              - "ec2:RevokeSecurityGroupIngress"
+              - "ec2:DeleteSecurityGroup"
+            Resource: "*"
+            Condition:
+              'Null':
+                "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:CreateLoadBalancer"
+              - "elasticloadbalancing:CreateTargetGroup"
+            Resource: "*"
+            Condition:
+              'Null':
+                "aws:RequestTag/elbv2.k8s.aws/cluster": "false"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:CreateListener"
+              - "elasticloadbalancing:DeleteListener"
+              - "elasticloadbalancing:CreateRule"
+              - "elasticloadbalancing:DeleteRule"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:AddTags"
+              - "elasticloadbalancing:RemoveTags"
+            Resource:
+              - "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*"
+              - "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*"
+              - "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+            Condition:
+              'Null':
+                "aws:RequestTag/elbv2.k8s.aws/cluster": "true"
+                "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:AddTags"
+              - "elasticloadbalancing:RemoveTags"
+            Resource:
+              - "arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*"
+              - "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*"
+              - "arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*"
+              - "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:ModifyLoadBalancerAttributes"
+              - "elasticloadbalancing:SetIpAddressType"
+              - "elasticloadbalancing:SetSecurityGroups"
+              - "elasticloadbalancing:SetSubnets"
+              - "elasticloadbalancing:DeleteLoadBalancer"
+              - "elasticloadbalancing:ModifyTargetGroup"
+              - "elasticloadbalancing:ModifyTargetGroupAttributes"
+              - "elasticloadbalancing:DeleteTargetGroup"
+            Resource: "*"
+            Condition:
+              'Null':
+                "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:RegisterTargets"
+              - "elasticloadbalancing:DeregisterTargets"
+            Resource: "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*"
+          - Effect: Allow
+            Action:
+              - "elasticloadbalancing:SetWebAcl"
+              - "elasticloadbalancing:ModifyListener"
+              - "elasticloadbalancing:AddListenerCertificates"
+              - "elasticloadbalancing:RemoveListenerCertificates"
+              - "elasticloadbalancing:ModifyRule"
+            Resource: "*"
+
+### Create IAM Role
+  AmazonEKSLoadBalancerControllerRolee:
+    Type: AWS::IAM::Role
+    DependsOn: AWSLoadBalancerControllerIAMPolicyy
+    Properties:
+      RoleName: AmazonEKSLoadBalancerControllerRolee
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Federated: !Sub arn:aws:iam::${AccountID}:oidc-provider/oidc.eks.${Region}.amazonaws.com/id/${OIDCProviderID}
+          Action: sts:AssumeRoleWithWebIdentity
+          Condition:
+            StringEquals:
+              oidc.eks.${Region}.amazonaws.com/id/${OIDCProviderID}:aud: sts.amazonaws.com
+              oidc.eks.${Region}.amazonaws.com/id/${OIDCProviderID}:sub: system:serviceaccount:kube-system:aws-load-balancer-controller
+      Path: /
+      ManagedPolicyArns:
+        - !Ref AWSLoadBalancerControllerIAMPolicyy
+
+  ALBControllerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ALBControllerLambdaRole
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ALBControllerLambdaPolicy1
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'logs:CreateLogGroup'
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/EKSALB-Controller-installer-py-${AWS::StackName}:*
+        - PolicyName: ALBControllerLambdaPolicy2
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "eks:DescribeCluster"
+                Resource: "*"        
+
+  LambdaLogGroupForEKSALBInstaller:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/EKSALB-Controller-installer-py-${AWS::StackName}
+      RetentionInDays: 7
+
+  EKSALBControllerInstaller:
+    Type: "AWS::Lambda::Function"
+    DependsOn: AmazonEKSLoadBalancerControllerRolee
+    Properties:
+      FunctionName: !Sub EKSALB-Controller-installer-py-${AWS::StackName}
+      Role: !GetAtt ALBControllerLambdaRole.Arn
+      Runtime: python3.9
+      Handler: lambda_function.lambda_handler
+      Description: An AWS Lambda function to install ALB controller on EKS Cluster
+      MemorySize: 1024 # Memory size in MB
+      Timeout: 300 # Timeout value in seconds
+      Environment:
+        Variables:
+          CLUSTER_NAME: !Ref EKSClusterName
+          EKS_ROLE_ARN: !GetAtt AmazonEKSLoadBalancerControllerRolee.Arn
+          CERT_MANAGER_YAML_URL: !Ref CertManagerYamlURL
+          ALB_CONTROLLER_YAML_URL: !Ref ALBControllerYamlURL
+          INGCLASS_YAM_URL: !Ref IngressClassYamlURL
+          OIDC_PROVIDER_ID: !Ref OIDCProviderID
+      PackageType: Zip
+      Code:
+        S3Bucket: aws-albeks-blog
+        S3Key: function.zip
+
+
