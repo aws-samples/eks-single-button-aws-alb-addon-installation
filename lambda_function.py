@@ -117,7 +117,7 @@ def lambda_handler(_event, _context):
     print('Install Cert-manager')
     # Install AWS LB Controller (Step 5 in official doc listed at top) :
     # a. Install cert-manager
-    cm_yaml_generator = yaml.safe_load_all(requests.get(cert_manager_yaml_url).content.decode("utf-8"))
+    cm_yaml_generator = yaml.safe_load_all(requests.get(cert_manager_yaml_url,timeout=10).content.decode("utf-8"))
     for x in list(cm_yaml_generator):
         print('Deploying ' + x["kind"] + ":" + x["metadata"]["name"])
         try:
@@ -130,7 +130,7 @@ def lambda_handler(_event, _context):
     print('*************************')
     print('Install controller')
     # b. Install the controller
-    alb_yaml_generator = yaml.safe_load_all(requests.get(alb_controller_yaml_url).content.decode("utf-8"))
+    alb_yaml_generator = yaml.safe_load_all(requests.get(alb_controller_yaml_url, timeout=10).content.decode("utf-8"))
     custom_objects_api = client.CustomObjectsApi()
     for y in list(alb_yaml_generator):
         if y['kind'] == "ServiceAccount":
@@ -158,7 +158,7 @@ def lambda_handler(_event, _context):
             utils.create_from_dict(k8s_client, y)
 
     # Deploy IngressClass and IngressClassParams
-    ingress_yaml_generator = yaml.safe_load_all(requests.get(ingclass_yaml_url).content.decode("utf-8"))
+    ingress_yaml_generator = yaml.safe_load_all(requests.get(ingclass_yaml_url, timeout=10).content.decode("utf-8"))
     for z in list(ingress_yaml_generator):
         if z['apiVersion'] == 'elbv2.k8s.aws/v1beta1':
             group = "elbv2.k8s.aws"
