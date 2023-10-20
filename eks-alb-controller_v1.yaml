@@ -16,6 +16,9 @@ Parameters:
   Region:
     Type: String
     Default: us-east-1
+  S3BucketWithLambdaCode:
+    Type: String
+    Default: S3 bucket Name with Lambda code from github
   CertManagerYamlURL:
     Type: String
     Description: EKS Cluster Cert Manager Yaml URL
@@ -269,7 +272,7 @@ Resources:
           OIDC_PROVIDER_ID: !Ref OIDCProviderID
       PackageType: Zip
       Code:
-        S3Bucket: aws-albeks-blog
+        S3Bucket: !Ref S3BucketWithLambdaCode
         S3Key: function.zip
 
 
