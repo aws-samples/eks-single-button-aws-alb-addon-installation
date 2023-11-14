@@ -261,7 +261,7 @@ Resources:
       Handler: lambda_function.lambda_handler
       Description: An AWS Lambda function to install ALB controller on EKS Cluster
       MemorySize: 1024 # Memory size in MB
-      Timeout: 300 # Timeout value in seconds
+      Timeout: 600 # Timeout value in seconds
       Environment:
         Variables:
           CLUSTER_NAME: !Ref EKSClusterName
